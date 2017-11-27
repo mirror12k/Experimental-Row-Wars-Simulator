@@ -48,18 +48,24 @@ function image_flip(image) {
 function FighterJetBlue(game, px, py, path) {
 	PathEntity.call(this, game, px, py, 32, 32, 
 		image_composite(image_colorize(game.images.fighter_jet_coloring, this.color), game.images.fighter_jet_base), path);
-	this.fired = false;
+	this.missile_store = 1;
 }
 FighterJetBlue.prototype = Object.create(PathEntity.prototype);
 FighterJetBlue.prototype.color = '#73f';
 FighterJetBlue.prototype.update = function(game) {
 	PathEntity.prototype.update.call(this, game);
+	var self = this;
+	
 	var enemies = game.find_near(this, FighterJetRed, 600);
+	enemies = enemies.filter(function (other) { return points_dist(self, other) > 400; });
 
-	if (enemies.length > 0 && !this.fired && Math.random() < 0.1) {
-		this.fired = true;
+	if (enemies.length > 0 && this.missile_store > 0 && Math.random() < 0.1) {
+		this.missile_store--;
 		game.entities_to_add.push(new AirMissile(game, this.px, this.py, this.color, enemies[0]));
 	}
+
+	var offset = point_offset(180 - this.angle, this.width / 2);
+	game.particle_systems.fire_particles.add_particle(this.px + offset.px, this.py + offset.py, 1);
 };
 FighterJetBlue.prototype.hit = function(game, other) {
 	game.entities_to_remove.push(this);
@@ -68,6 +74,7 @@ FighterJetBlue.prototype.hit = function(game, other) {
 function FighterJetRed(game, px, py, path) {
 	PathEntity.call(this, game, px, py, 32, 32, 
 		image_flip(image_composite(image_colorize(game.images.fighter_jet_coloring, this.color), game.images.fighter_jet_base)), path);
+	this.flare_store = 8;
 	this.dead = false;
 	this.sy = 0;
 	this.angle_granularity = 5;
@@ -76,6 +83,21 @@ FighterJetRed.prototype = Object.create(PathEntity.prototype);
 FighterJetRed.prototype.color = '#f33';
 FighterJetRed.prototype.update = function(game) {
 	PathEntity.prototype.update.call(this, game);
+
+	var self = this;
+
+	var missiles = game.find_near(this, AirMissile, 400);
+	missiles = missiles.filter(function (other) { return other.target === self; });
+	if (missiles.length > 0 && this.flare_store > 0 && Math.random() < 0.5) {
+		this.flare_store--;
+		var flare_ent = new AirFlare(game, this.px, this.py, [
+			{ timeout: 20 + Math.random() * 20, sy: 4, sx: this.path[0].sx + Math.random() * 5 - 2 }]);
+		game.entities_to_add.push(flare_ent);
+		if (Math.random() < 0.075) {
+			missiles[0].target = flare_ent;
+		}
+	}
+
 
 	if (this.dead) {
 		this.sy += 0.2;
@@ -89,8 +111,10 @@ FighterJetRed.prototype.update = function(game) {
 
 	var offset = point_offset(this.angle, this.width / 2);
 	game.particle_systems.fire_particles.add_particle(this.px + offset.px, this.py + offset.py, 1);
+
+	// game.particle_systems.flare_particles.add_particle(this.px + offset.px, this.py + offset.py, 2);
+
 	if (this.py >= 300) {
-		console.log('pop');
 		game.entities_to_remove.push(this);
 	}
 };
@@ -128,6 +152,26 @@ AirMissile.prototype.update = function(game) {
 		game.entities_to_remove.push(this);
 	}
 };
+
+
+
+
+function AirFlare(game, px, py, path) {
+	PathEntity.call(this, game, px, py, 16, 16, game.images.particle_flare, path);
+	this.max_frame = 8;
+	this.frame_step = 0;
+}
+AirFlare.prototype = Object.create(PathEntity.prototype);
+AirFlare.prototype.update = function(game) {
+	PathEntity.prototype.update.call(this, game);
+
+	this.frame_step = (this.frame_step + 1) % 16;
+	this.frame = Math.floor(this.frame_step / 2);
+};
+AirFlare.prototype.hit = function(game, other) {
+	game.entities_to_remove.push(this);
+};
+
 
 
 
@@ -170,6 +214,7 @@ function main () {
 		air_missile_coloring: "air_missile_coloring.png",
 
 		particle_steam: "particle_steam.png",
+		particle_flare: "particle_flare.png",
 	};
 
 	load_all_images(images, function () {
@@ -203,6 +248,13 @@ function main () {
 			particle_image: game.images.particle_steam,
 			particle_longevity: 0.4,
 			particle_size: 8,
+		});
+		game.particle_systems.flare_particles = new ParticleEffectSystem(game, {
+			particle_image: game.images.particle_flare,
+			particle_size: 16,
+			frame_step: 0.5,
+			particle_sy: -4,
+			max_frame: 8,
 		});
 
 		// game.entities.push(new FighterJetRed(game, 640, 100, [ { sx: -3 }]));

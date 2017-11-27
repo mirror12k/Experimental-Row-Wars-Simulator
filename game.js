@@ -44,6 +44,82 @@ function image_flip(image) {
 }
 
 
+function ConfettiParticleEffectSystem(game, config) {
+	ScreenEntity.call(this, game);
+	this.stroke_style = config.stroke_style || '#fff';
+	this.stroke_transition = config.stroke_transition;
+	this.modulate_width = config.modulate_width;
+
+	// this.particle_longevity = config.particle_longevity || 0.05;
+	this.particle_base_timer = config.particle_base_timer || 0;
+	this.particle_max_timer = config.particle_max_timer || 20;
+
+	this.particles = [];
+}
+ConfettiParticleEffectSystem.prototype = Object.create(ScreenEntity.prototype);
+ConfettiParticleEffectSystem.prototype.constructor = ConfettiParticleEffectSystem;
+ConfettiParticleEffectSystem.prototype.class_name = 'ConfettiParticleEffectSystem';
+ConfettiParticleEffectSystem.prototype.add_particle = function(start, end, width) {
+	var new_particle = {
+		start: start,
+		end: end,
+		width: width || 1,
+		timer: Math.floor(Math.random() * this.particle_base_timer),
+	};
+	this.particles.push(new_particle);
+
+	return new_particle;
+};
+ConfettiParticleEffectSystem.prototype.update = function(game) {
+	for (var i = this.particles.length - 1; i >= 0; i--) {
+		this.particles[i].timer++;
+
+		if (this.particles[i].timer >= this.particle_max_timer) {
+			this.particles.splice(i, 1);
+		}
+	}
+};
+ConfettiParticleEffectSystem.prototype.draw = function(ctx) {
+	if (this.visible) {
+		// console.log("drawing ", this.particles.length, "particles");
+		for (var i = 0; i < this.particles.length; i++) {
+			var p = this.particles[i];
+			ctx.save();
+
+			if (this.stroke_transition) {
+				var degree = p.timer / this.particle_max_timer;
+				var color = [
+					this.stroke_style[0] * (1 - degree) + this.stroke_transition[0] * degree,
+					this.stroke_style[1] * (1 - degree) + this.stroke_transition[1] * degree,
+					this.stroke_style[2] * (1 - degree) + this.stroke_transition[2] * degree,
+				];
+				ctx.strokeStyle = 'rgb('+color[0]+','+color[1]+','+color[2]+')';
+			} else {
+				ctx.strokeStyle = this.stroke_style;
+			}
+
+			if (this.modulate_width)
+				ctx.lineWidth = this.particles[i].width * (1 - this.particles[i].timer / this.particle_max_timer);
+			else
+				ctx.lineWidth = p.width;
+			
+			ctx.beginPath();
+			ctx.moveTo(p.start.px, p.start.py);
+			ctx.lineTo(p.end.px, p.end.py);
+			ctx.stroke();
+
+			ctx.restore();
+		}
+	}
+};
+
+
+
+
+
+
+
+
 
 function FighterJetBlue(game, px, py, path) {
 	PathEntity.call(this, game, px, py, 32, 32, 
@@ -213,8 +289,14 @@ AirMissile.prototype = Object.create(ScreenEntity.prototype);
 AirMissile.prototype.update = function(game) {
 	ScreenEntity.prototype.update.call(this, game);
 
-	game.particle_systems.smoke_particles.add_particle(this.px, this.py, 1);
-	game.particle_systems.fire_particles.add_particle(this.px, this.py, 1);
+
+	if (Math.random() < 0.5) {
+		if (this.last_particle)
+			this.last_particle.start = { px: this.px, py: this.py };
+		this.last_particle = game.particle_systems.blue_missile_trail_particles.add_particle(this, { px: this.px, py: this.py }, 3);
+	}
+	// game.particle_systems.smoke_particles.add_particle(this.px, this.py, 1);
+	// game.particle_systems.fire_particles.add_particle(this.px, this.py, 1);
 	
 	this.angle = point_angle(this.px, this.py, this.target.px, this.target.py);
 	
@@ -262,7 +344,7 @@ function AirFlare(game, px, py, path) {
 	PathEntity.call(this, game, px, py, 16, 16, game.images.particle_flare, path);
 	this.max_frame = 8;
 	this.frame_step = 0;
-	this.flare_trail = [];
+	this.last_particle = undefined;
 }
 AirFlare.prototype = Object.create(PathEntity.prototype);
 AirFlare.prototype.update = function(game) {
@@ -271,31 +353,36 @@ AirFlare.prototype.update = function(game) {
 	this.frame_step = (this.frame_step + 1) % 16;
 	this.frame = Math.floor(this.frame_step / 2);
 
-	if (Math.random() < 0.5) {
-		this.flare_trail.push([this.px, this.py]);
-		if (this.flare_trail.length >= 5)
-			this.flare_trail.shift();
+	if (Math.random() < 0.25) {
+		if (this.last_particle)
+			this.last_particle.start = { px: this.px, py: this.py };
+		this.last_particle = game.particle_systems.flare_trail_particles.add_particle(this, { px: this.px, py: this.py }, 5);
 	}
+
+	// 	this.flare_trail.push([this.px, this.py]);
+	// 	if (this.flare_trail.length >= 5)
+	// 		this.flare_trail.shift();
+	// }
 };
-AirFlare.prototype.draw = function(ctx) {
-	PathEntity.prototype.draw.call(this, ctx);
+// AirFlare.prototype.draw = function(ctx) {
+// 	PathEntity.prototype.draw.call(this, ctx);
 
-	ctx.strokeStyle = '#a84';
-	ctx.lineWidth = 1;
+// 	ctx.strokeStyle = '#a84';
+// 	ctx.lineWidth = 1;
 
-	for (var i = this.flare_trail.length - 1; i >= 0; i--) {
-		ctx.beginPath();
-		ctx.lineWidth = i * 2 + 1;
-		if (i === this.flare_trail.length - 1) {
-			ctx.moveTo(this.px, this.py);
-		} else {
-			ctx.moveTo(this.flare_trail[i+1][0], this.flare_trail[i+1][1]);
-		}
-		ctx.lineTo(this.flare_trail[i][0], this.flare_trail[i][1]);
-		ctx.stroke();
-	}
+// 	for (var i = this.flare_trail.length - 1; i >= 0; i--) {
+// 		ctx.beginPath();
+// 		ctx.lineWidth = i * 2 + 1;
+// 		if (i === this.flare_trail.length - 1) {
+// 			ctx.moveTo(this.px, this.py);
+// 		} else {
+// 			ctx.moveTo(this.flare_trail[i+1][0], this.flare_trail[i+1][1]);
+// 		}
+// 		ctx.lineTo(this.flare_trail[i][0], this.flare_trail[i][1]);
+// 		ctx.stroke();
+// 	}
 	
-};
+// };
 AirFlare.prototype.hit = function(game, other) {
 	game.entities_to_remove.push(this);
 };
@@ -380,6 +467,16 @@ function main () {
 			particle_image: game.images.particle_steam,
 			particle_longevity: 0.4,
 			particle_size: 8,
+		});
+		game.particle_systems.flare_trail_particles = new ConfettiParticleEffectSystem(game, {
+			stroke_style: '#a84',
+			modulate_width: true,
+		});
+		game.particle_systems.blue_missile_trail_particles = new ConfettiParticleEffectSystem(game, {
+			stroke_style: [0x77, 0x33, 0xff],
+			stroke_transition: [0xff, 0xff, 0xff],
+			particle_max_timer: 40,
+			modulate_width: true,
 		});
 		// game.particle_systems.flare_particles = new ParticleEffectSystem(game, {
 		// 	particle_image: game.images.particle_flare,

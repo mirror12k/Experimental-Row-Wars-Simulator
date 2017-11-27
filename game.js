@@ -57,7 +57,7 @@ FighterJetBlue.prototype.update = function(game) {
 	var self = this;
 	
 	var enemies = game.find_near(this, FighterJetRed, 600);
-	enemies = enemies.filter(function (other) { return points_dist(self, other) > 400; });
+	enemies = enemies.filter(function (other) { return points_dist(self, other) > 300 && self.px < other.px; });
 
 	if (enemies.length > 0 && this.missile_store > 0 && Math.random() < 0.1) {
 		this.missile_store--;
@@ -91,9 +91,9 @@ FighterJetRed.prototype.update = function(game) {
 	if (missiles.length > 0 && this.flare_store > 0 && Math.random() < 0.5) {
 		this.flare_store--;
 		var flare_ent = new AirFlare(game, this.px, this.py, [
-			{ timeout: 20 + Math.random() * 20, sy: 4, sx: this.path[0].sx + Math.random() * 5 - 2 }]);
+			{ timeout: 20 + Math.random() * 20, sy: 3, sx: this.path[0].sx + Math.random() * 5 - 2 }]);
 		game.entities_to_add.push(flare_ent);
-		if (Math.random() < 0.075) {
+		if (Math.random() < 0.1) {
 			missiles[0].target = flare_ent;
 		}
 	}
@@ -106,7 +106,7 @@ FighterJetRed.prototype.update = function(game) {
 		this.angle = point_angle(0, 0, -this.path[0].sx, -this.sy);
 
 		var offset = point_offset(this.angle, this.width / 2);
-		game.particle_systems.smoke_particles.add_particle(this.px + offset.px, this.py + offset.py, 2);
+		game.particle_systems.large_smoke_particles.add_particle(this.px + offset.px, this.py + offset.py, 2);
 	}
 
 	var offset = point_offset(this.angle, this.width / 2);
@@ -160,6 +160,7 @@ function AirFlare(game, px, py, path) {
 	PathEntity.call(this, game, px, py, 16, 16, game.images.particle_flare, path);
 	this.max_frame = 8;
 	this.frame_step = 0;
+	this.flare_trail = [];
 }
 AirFlare.prototype = Object.create(PathEntity.prototype);
 AirFlare.prototype.update = function(game) {
@@ -167,6 +168,31 @@ AirFlare.prototype.update = function(game) {
 
 	this.frame_step = (this.frame_step + 1) % 16;
 	this.frame = Math.floor(this.frame_step / 2);
+
+	if (Math.random() < 0.5) {
+		this.flare_trail.push([this.px, this.py]);
+		if (this.flare_trail.length >= 5)
+			this.flare_trail.shift();
+	}
+};
+AirFlare.prototype.draw = function(ctx) {
+	PathEntity.prototype.draw.call(this, ctx);
+
+	ctx.strokeStyle = '#a84';
+	ctx.lineWidth = 1;
+
+	for (var i = this.flare_trail.length - 1; i >= 0; i--) {
+		ctx.beginPath();
+		ctx.lineWidth = i * 2 + 1;
+		if (i === this.flare_trail.length - 1) {
+			ctx.moveTo(this.px, this.py);
+		} else {
+			ctx.moveTo(this.flare_trail[i+1][0], this.flare_trail[i+1][1]);
+		}
+		ctx.lineTo(this.flare_trail[i][0], this.flare_trail[i][1]);
+		ctx.stroke();
+	}
+	
 };
 AirFlare.prototype.hit = function(game, other) {
 	game.entities_to_remove.push(this);
@@ -232,7 +258,7 @@ function main () {
 			]}},
 		]);
 		game.particle_systems.smoke_particles = new ParticleEffectSystem(game, {
-			fill_style: '#444',
+			fill_style: '#aaa',
 			particle_image: game.images.particle_steam,
 			particle_longevity: 0.1,
 			particle_size: 8,
@@ -249,13 +275,13 @@ function main () {
 			particle_longevity: 0.4,
 			particle_size: 8,
 		});
-		game.particle_systems.flare_particles = new ParticleEffectSystem(game, {
-			particle_image: game.images.particle_flare,
-			particle_size: 16,
-			frame_step: 0.5,
-			particle_sy: -4,
-			max_frame: 8,
-		});
+		// game.particle_systems.flare_particles = new ParticleEffectSystem(game, {
+		// 	particle_image: game.images.particle_flare,
+		// 	particle_size: 16,
+		// 	frame_step: 0.5,
+		// 	particle_sy: -4,
+		// 	max_frame: 8,
+		// });
 
 		// game.entities.push(new FighterJetRed(game, 640, 100, [ { sx: -3 }]));
 		// game.entities.push(new FighterJetBlue(game, -20, 150, [ { sx: 2.5 }]));

@@ -628,6 +628,14 @@ PathEntity.prototype.trigger_path_action = function(game, action) {
 		}
 	}
 
+	if (action.repeat !== undefined) {
+		if (this.action_repeat === undefined || this.action_repeat <= 0) {
+			this.action_repeat = action.repeat;
+		}
+	} else {
+		this.action_repeat = undefined;
+	}
+
 
 	if (action.sx === undefined)
 		action.sx = 0;
@@ -702,10 +710,12 @@ PathEntity.prototype.update = function(game) {
 			this.current_action.da *= this.current_action.fda;
 		}
 		if (this.current_action.da !== undefined) {
-			this.current_action.angle += this.current_action.da;
-			this.angle = this.current_action.angle;
-			this.current_action.sx = Math.cos(this.current_action.angle / 180 * Math.PI) * this.current_action.speed;
-			this.current_action.sy = Math.sin(this.current_action.angle / 180 * Math.PI) * this.current_action.speed;
+			this.angle += this.current_action.da;
+			// this.angle = this.current_action.angle;
+			if (this.current_action.speed) {
+				this.current_action.sx = Math.cos(this.angle / 180 * Math.PI) * this.current_action.speed;
+				this.current_action.sy = Math.sin(this.angle / 180 * Math.PI) * this.current_action.speed;
+			}
 		}
 
 		if (this.current_action.trail) {
@@ -720,10 +730,10 @@ PathEntity.prototype.update = function(game) {
 		if (this.timer !== undefined) {
 			this.timer--;
 			if (this.timer <= 0) {
-				if (this.current_action.repeat !== undefined && this.current_action.repeat > 1) {
-					this.current_action.repeat--;
+				if (this.action_repeat !== undefined && this.action_repeat > 1) {
 					this.timer = this.current_action.timeout;
 					this.trigger_path_action(game, this.current_action);
+					this.action_repeat--;
 				} else {
 					this.current_action = undefined;
 				}

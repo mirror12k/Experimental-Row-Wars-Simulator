@@ -230,6 +230,87 @@ FighterJetRed.prototype.hit = function(game, other) {
 	}
 };
 
+
+
+function PTBoatBlue(game, px, py, path) {
+	PathEntity.call(this, game, px, py, 96, 96, 
+		image_composite(image_colorize(game.images.pt_boat_coloring, this.color), game.images.pt_boat_base), path);
+	// this.missile_store = 1;
+
+	this.dead = false;
+	this.sy = 0;
+	this.angle_granularity = 2;
+	this.swing = 0;
+}
+PTBoatBlue.prototype = Object.create(PathEntity.prototype);
+PTBoatBlue.prototype.color = '#73f';
+PTBoatBlue.prototype.update = function(game) {
+	PathEntity.prototype.update.call(this, game);
+	var self = this;
+
+	this.swing = (this.swing + 2) % 360;
+	this.angle = Math.sin(this.swing / 180 * Math.PI) * 4;
+	
+	// // targeting and attacking
+	// var enemies = game.find_near(this, FighterJetRed, 600);
+	// enemies = enemies.filter(function (other) { return points_dist(self, other) > 300 && self.px < other.px; });
+	// if (enemies.length > 0 && this.missile_store > 0 && Math.random() < 0.1) {
+	// 	this.missile_store--;
+	// 	game.entities_to_add.push(new AirMissile(game, this.px, this.py, this.color, enemies[0]));
+	// }
+
+	// // death spiral
+	// if (this.dead) {
+	// 	this.sy += 0.1;
+	// 	this.py += this.sy;
+
+	// 	this.angle = point_angle(0, 0, this.path[0].sx, this.sy);
+
+	// 	var offset = point_offset(180 + this.angle, this.width / 2);
+	// 	game.particle_systems.large_smoke_particles.add_particle(this.px + offset.px, this.py + offset.py, 2);
+	// }
+	
+	// // death plane
+	// if (this.py >= 300) {
+	// 	game.entities_to_remove.push(this);
+	// }
+
+	// var offset = point_offset(180 + this.angle, this.width / 2);
+	// game.particle_systems.fire_particles.add_particle(this.px + offset.px, this.py + offset.py, 1);
+};
+// PTBoatBlue.prototype.hit = function(game, other) {
+// 	this.dead = true;
+// 	for (var i = 0; i < 20; i++) {
+// 		game.particle_systems.large_smoke_particles.add_particle(this.px, this.py, 1.5);
+// 		game.particle_systems.fire_particles.add_particle(this.px, this.py, 2);
+// 	}
+// };
+
+
+
+function SoldierBlue(game, px, py, path) {
+	PathEntity.call(this, game, px, py, 16, 16, 
+		image_composite(image_colorize(game.images.soldier_coloring, this.color), game.images.soldier_base), path);
+	// this.missile_store = 1;
+
+	this.max_frame = 4;
+}
+SoldierBlue.prototype = Object.create(PathEntity.prototype);
+SoldierBlue.prototype.color = '#73f';
+SoldierBlue.prototype.update = function(game) {
+	PathEntity.prototype.update.call(this, game);
+	this.frame = (this.frame + 1) % 4;
+
+	// var self = this;
+
+	// this.swing = (this.swing + 2) % 360;
+	// this.angle = Math.sin(this.swing / 180 * Math.PI) * 4;
+};
+
+
+
+
+
 function SAMLauncherRed(game, px, py) {
 	ScreenEntity.call(this, game, px, py, 64, 64, 
 		image_flip(image_composite(image_colorize(game.images.sam_launcher_coloring, this.color), game.images.sam_launcher_base)));
@@ -289,7 +370,6 @@ AirMissile.prototype = Object.create(ScreenEntity.prototype);
 AirMissile.prototype.update = function(game) {
 	ScreenEntity.prototype.update.call(this, game);
 
-
 	if (Math.random() < 0.5) {
 		if (this.last_particle)
 			this.last_particle.start = { px: this.px, py: this.py };
@@ -322,8 +402,14 @@ SAMMissile.prototype.update = function(game) {
 	ScreenEntity.prototype.update.call(this, game);
 
 	var offset = point_offset(this.angle, this.width / 2);
-	game.particle_systems.smoke_particles.add_particle(this.px - offset.px, this.py - offset.py, 1);
-	game.particle_systems.fire_particles.add_particle(this.px - offset.px, this.py - offset.py, 1);
+	// game.particle_systems.smoke_particles.add_particle(this.px - offset.px, this.py - offset.py, 1);
+	// game.particle_systems.fire_particles.add_particle(this.px - offset.px, this.py - offset.py, 1);
+
+	if (Math.random() < 0.5) {
+		if (this.last_particle)
+			this.last_particle.start = { px: this.px + offset.px, py: this.py + offset.py };
+		this.last_particle = game.particle_systems.red_missile_trail_particles.add_particle(this, { px: this.px + offset.px, py: this.py + offset.py }, 5);
+	}
 	
 	this.angle = point_angle(this.px, this.py, this.target.px, this.target.py);
 	
@@ -425,12 +511,16 @@ function main () {
 
 		fighter_jet_base: "fighter_jet_base.png",
 		fighter_jet_coloring: "fighter_jet_coloring.png",
+		pt_boat_base: "pt_boat_base.png",
+		pt_boat_coloring: "pt_boat_coloring.png",
 		sam_launcher_base: "sam_launcher_base.png",
 		sam_launcher_coloring: "sam_launcher_coloring.png",
 		air_missile_base: "air_missile_base.png",
 		air_missile_coloring: "air_missile_coloring.png",
 		sam_missile_base: "sam_missile_base.png",
 		sam_missile_coloring: "sam_missile_coloring.png",
+		soldier_base: "soldier_base.png",
+		soldier_coloring: "soldier_coloring.png",
 
 		particle_steam: "particle_steam.png",
 		particle_flare: "particle_flare.png",
@@ -448,6 +538,15 @@ function main () {
 			]}},
 			{ timeout: 150, action: { spawn_entity: [
 				{ class: FighterJetRed, px: 640 + 32, py: 150, args: [ [{ timeout: 360, sx: -2.5 }], ] },
+			]}},
+			{ timeout: 300, action: { spawn_entity: [
+				{ class: PTBoatBlue, px: -32, py: 400, args: [ [
+					{ timeout: 330, sx: 1 },
+					{ timeout: 20, repeat: 3, spawn_entity: [{ class: SoldierBlue, px: 64, args: [[
+						{ timeout: 240, sx: 1 },
+					]] }] },
+					{ timeout: 60 },
+				], ] },
 			]}},
 		]);
 		game.particle_systems.smoke_particles = new ParticleEffectSystem(game, {
@@ -474,6 +573,12 @@ function main () {
 		});
 		game.particle_systems.blue_missile_trail_particles = new ConfettiParticleEffectSystem(game, {
 			stroke_style: [0x77, 0x33, 0xff],
+			stroke_transition: [0xff, 0xff, 0xff],
+			particle_max_timer: 40,
+			modulate_width: true,
+		});
+		game.particle_systems.red_missile_trail_particles = new ConfettiParticleEffectSystem(game, {
+			stroke_style: [0xff, 0x33, 0x33],
 			stroke_transition: [0xff, 0xff, 0xff],
 			particle_max_timer: 40,
 			modulate_width: true,

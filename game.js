@@ -291,15 +291,69 @@ PTBoatBlue.prototype.update = function(game) {
 function SoldierBlue(game, px, py, path) {
 	PathEntity.call(this, game, px, py, 16, 16, 
 		image_composite(image_colorize(game.images.soldier_coloring, this.color), game.images.soldier_base), path);
-	// this.missile_store = 1;
-
 	this.max_frame = 4;
+
+	// this.missile_store = 1;
+	this.health = 10;
+	this.dead = false;
 }
 SoldierBlue.prototype = Object.create(PathEntity.prototype);
 SoldierBlue.prototype.color = '#73f';
 SoldierBlue.prototype.update = function(game) {
 	PathEntity.prototype.update.call(this, game);
-	this.frame = (this.frame + 1) % 4;
+	if (!this.dead) {
+		this.frame = (this.frame + 1) % 4;
+	}
+
+	// var self = this;
+
+	// this.swing = (this.swing + 2) % 360;
+	// this.angle = Math.sin(this.swing / 180 * Math.PI) * 4;
+};
+SoldierBlue.prototype.hit = function(game) {
+	if (!this.dead) {
+		this.health--;
+		if (this.health <= 0) {
+			this.dead = true;
+			this.frame = 0;
+			
+			this.path = [
+				{ timeout: 60, angle: -90 },
+			];
+			this.path_index = 0;
+			this.current_action = undefined;
+		}
+	}
+};
+
+
+function BunkerRed(game, px, py, path) {
+	PathEntity.call(this, game, px, py, 32, 32, 
+		image_composite(image_colorize(game.images.bunker_coloring, this.color), game.images.bunker_base), path);
+	this.bullets_loaded_max = 3;
+	this.bullets_loaded = this.bullets_loaded_max;
+}
+BunkerRed.prototype = Object.create(PathEntity.prototype);
+BunkerRed.prototype.color = '#f33';
+BunkerRed.prototype.fire = function(game) {
+	var offsetx = Math.random() * 9 - 4;
+	var offsety = Math.random() * 5 - 2;
+	game.particle_systems.bullet_tracer_particles.add_particle({ px: this.px - this.width / 4, py: this.py + this.height / 12 },
+			{ px: this.px - this.width + offsetx, py: this.py + offsety }, 2);
+};
+BunkerRed.prototype.update = function(game) {
+	PathEntity.prototype.update.call(this, game);
+	var self = this;
+
+	var enemies = game.find_near(this, SoldierBlue, 150);
+	enemies = enemies.filter(function (other) { return !other.dead && other.px < self.px; });
+	if (enemies.length > 0 && this.bullets_loaded === this.bullets_loaded_max) {
+		this.bullets_loaded = 0;
+		this.fire(game);
+		enemies[0].hit(game);
+	} else if (this.bullets_loaded < this.bullets_loaded_max) {
+		this.bullets_loaded++;
+	}
 
 	// var self = this;
 
@@ -312,7 +366,7 @@ SoldierBlue.prototype.update = function(game) {
 
 
 function SAMLauncherRed(game, px, py) {
-	ScreenEntity.call(this, game, px, py, 64, 64, 
+	ScreenEntity.call(this, game, px, py, 48, 48, 
 		image_flip(image_composite(image_colorize(game.images.sam_launcher_coloring, this.color), game.images.sam_launcher_base)));
 
 	this.missile_decoration = new ScreenEntity(game, 0, -4, 32, 32,
@@ -521,6 +575,8 @@ function main () {
 		sam_missile_coloring: "sam_missile_coloring.png",
 		soldier_base: "soldier_base.png",
 		soldier_coloring: "soldier_coloring.png",
+		bunker_base: "bunker_base.png",
+		bunker_coloring: "bunker_coloring.png",
 
 		particle_steam: "particle_steam.png",
 		particle_flare: "particle_flare.png",
@@ -571,6 +627,10 @@ function main () {
 			stroke_style: '#a84',
 			modulate_width: true,
 		});
+		game.particle_systems.bullet_tracer_particles = new ConfettiParticleEffectSystem(game, {
+			stroke_style: '#da6',
+			particle_max_timer: 2,
+		});
 		game.particle_systems.blue_missile_trail_particles = new ConfettiParticleEffectSystem(game, {
 			stroke_style: [0x77, 0x33, 0xff],
 			stroke_transition: [0xff, 0xff, 0xff],
@@ -594,6 +654,7 @@ function main () {
 		// game.entities.push(new FighterJetRed(game, 640, 100, [ { sx: -3 }]));
 		// game.entities.push(new FighterJetBlue(game, -20, 150, [ { sx: 2.5 }]));
 		game.entities.push(new SAMLauncherRed(game, 580, 350));
+		game.entities.push(new BunkerRed(game, 550, 380));
 
 		setInterval(game.step_game_frame.bind(game, ctx), 1000 / 60);
 	});

@@ -250,7 +250,7 @@ AATankRed.prototype.update = function(game) {
 		this.fire_timer--;
 	}
 
-	// detection and flare evasion
+	// find the target
 	var targets = game.find_near(this, FighterJetBlue, 800);
 	targets = targets.filter(function (other) { return other.px < self.px; });
 	if (targets.length > 0 && this.fire_timer <= 0) {
@@ -266,27 +266,13 @@ AATankRed.prototype.update = function(game) {
 		// set the bullet on it's path
 		var angle = point_angle(this.px, this.py, target.px, target.py) + Math.random() * 5 - 2.5;
 		var bullet = new AABullet(game, this.px, this.py, [{ timeout: 60, speed: bullet_speed, angle: angle }]);
-		// var bullet = new AABullet(game, this.px, this.py, [{ timeout: 120, sx: 2, sy: 2 }]);
 		game.entities_to_add.push(bullet);
 	}
-
-	// // death spiral
-	// if (this.dead) {
-	// 	this.sy += 0.1;
-	// 	this.py += this.sy;
-
-	// 	this.angle = point_angle(0, 0, -this.path[0].sx, -this.sy);
-
-	// 	var offset = point_offset(this.angle, this.width / 2);
-	// 	game.particle_systems.large_smoke_particles.add_particle(this.px + offset.px, this.py + offset.py, 2);
-	// }
-
 };
 AATankRed.prototype.hit = function(game, other) {
-	this.dead = true;
+	game.entities_to_remove.push(this);
 	for (var i = 0; i < 20; i++) {
 		game.particle_systems.large_smoke_particles.add_particle(this.px, this.py, 1.5);
-		game.particle_systems.fire_particles.add_particle(this.px, this.py, 2);
 	}
 };
 
@@ -310,41 +296,67 @@ PTBoatBlue.prototype.update = function(game) {
 
 	this.swing = (this.swing + 2) % 360;
 	this.angle = Math.sin(this.swing / 180 * Math.PI) * 4;
-	
-	// // targeting and attacking
-	// var enemies = game.find_near(this, FighterJetRed, 600);
-	// enemies = enemies.filter(function (other) { return points_dist(self, other) > 300 && self.px < other.px; });
-	// if (enemies.length > 0 && this.missile_store > 0 && Math.random() < 0.1) {
-	// 	this.missile_store--;
-	// 	game.entities_to_add.push(new AirMissile(game, this.px, this.py, this.color, enemies[0]));
-	// }
-
-	// // death spiral
-	// if (this.dead) {
-	// 	this.sy += 0.1;
-	// 	this.py += this.sy;
-
-	// 	this.angle = point_angle(0, 0, this.path[0].sx, this.sy);
-
-	// 	var offset = point_offset(180 + this.angle, this.width / 2);
-	// 	game.particle_systems.large_smoke_particles.add_particle(this.px + offset.px, this.py + offset.py, 2);
-	// }
-	
-	// // death plane
-	// if (this.py >= 300) {
-	// 	game.entities_to_remove.push(this);
-	// }
-
-	// var offset = point_offset(180 + this.angle, this.width / 2);
-	// game.particle_systems.fire_particles.add_particle(this.px + offset.px, this.py + offset.py, 1);
 };
-// PTBoatBlue.prototype.hit = function(game, other) {
-// 	this.dead = true;
-// 	for (var i = 0; i < 20; i++) {
-// 		game.particle_systems.large_smoke_particles.add_particle(this.px, this.py, 1.5);
-// 		game.particle_systems.fire_particles.add_particle(this.px, this.py, 2);
-// 	}
-// };
+
+
+function CruiseMissilePTBoatBlue(game, px, py, path) {
+	PathEntity.call(this, game, px, py, 96, 96, 
+		image_composite(image_colorize(game.images.pt_boat_coloring, this.color), game.images.pt_boat_base), path);
+	// this.missile_store = 1;
+
+
+	this.missile_decoration = new ScreenEntity(game, this.width / 4, 10, 32, 32,
+		image_composite(image_colorize(game.images.sam_missile_coloring, this.color), game.images.sam_missile_base));
+	this.missile_decoration.angle = -15;
+	this.missile_decoration.z_index = -1;
+	this.sub_entities.push(this.missile_decoration);
+
+	this.missiles_loaded = 1;
+	this.reload = 0;
+	this.lock_on = 0;
+
+	this.dead = false;
+	this.sy = 0;
+	this.angle_granularity = 2;
+	this.swing = 0;
+}
+CruiseMissilePTBoatBlue.prototype = Object.create(PathEntity.prototype);
+CruiseMissilePTBoatBlue.prototype.color = '#73f';
+CruiseMissilePTBoatBlue.prototype.update = function(game) {
+	PathEntity.prototype.update.call(this, game);
+	var self = this;
+
+	this.swing = (this.swing + 2) % 360;
+	this.angle = Math.sin(this.swing / 180 * Math.PI) * 4;
+
+	var self = this;
+
+	// targeting and attacking
+	var enemies = game.find_near(this, AATankRed, 800);
+	if (enemies.length > 0 && this.missiles_loaded > 0) {
+		this.lock_on++;
+		if (this.lock_on === 240) {
+			this.lock_on = 0;
+			this.missiles_loaded--;
+
+			var offset = d2_point_offset(this.angle, this.missile_decoration.px, this.missile_decoration.py);
+			game.entities_to_add.push(new CruiseMissile(game, this.px + offset.px, this.py + offset.py, this.color, enemies[0], this.py - 40));
+		}
+	} else {
+		this.lock_on = 0;
+	}
+
+	// reloading
+	if (this.missiles_loaded < 1) {
+		this.reload++;
+		if (this.reload >= 180) {
+			this.reload = 0;
+			this.missiles_loaded++;
+		}
+	}
+
+	this.missile_decoration.visible = this.missiles_loaded > 0;
+};
 
 
 
@@ -454,7 +466,7 @@ SAMLauncherRed.prototype.update = function(game) {
 		if (this.lock_on === 60) {
 			this.lock_on = 0;
 			this.missiles_loaded--;
-			game.entities_to_add.push(new SAMMissileRed(game, this.px, this.py - 4, this.color, enemies[0]));
+			game.entities_to_add.push(new SAMMissile(game, this.px, this.py - 4, this.color, enemies[0]));
 		}
 	} else {
 		this.lock_on = 0;
@@ -504,15 +516,15 @@ AirMissile.prototype.update = function(game) {
 	}
 };
 
-function SAMMissileRed(game, px, py, color, target) {
+function SAMMissile(game, px, py, color, target) {
 	ScreenEntity.call(this, game, px, py, 32, 32, 
 		image_composite(image_colorize(game.images.sam_missile_coloring, color), game.images.sam_missile_base));
 	this.target = target;
 	this.speed = 6;
 	this.angle_granularity = 5;
 }
-SAMMissileRed.prototype = Object.create(ScreenEntity.prototype);
-SAMMissileRed.prototype.update = function(game) {
+SAMMissile.prototype = Object.create(ScreenEntity.prototype);
+SAMMissile.prototype.update = function(game) {
 	ScreenEntity.prototype.update.call(this, game);
 
 	var offset = point_offset(this.angle, this.width / 2);
@@ -526,6 +538,51 @@ SAMMissileRed.prototype.update = function(game) {
 	}
 	
 	this.angle = point_angle(this.px, this.py, this.target.px, this.target.py);
+	
+	offset = point_offset(this.angle, this.speed);
+	this.px += offset.px;
+	this.py += offset.py;
+
+	if (points_dist(this, this.target) < this.speed) {
+		this.target.hit(game, this);
+		game.entities_to_remove.push(this);
+	}
+};
+
+function CruiseMissile(game, px, py, color, target, cruise_height) {
+	ScreenEntity.call(this, game, px, py, 32, 32, 
+		image_composite(image_colorize(game.images.sam_missile_coloring, color), game.images.sam_missile_base));
+	this.target = target;
+	this.speed = 6;
+	this.angle_granularity = 5;
+
+	this.cruise_height = cruise_height;
+}
+CruiseMissile.prototype = Object.create(ScreenEntity.prototype);
+CruiseMissile.prototype.update = function(game) {
+	ScreenEntity.prototype.update.call(this, game);
+
+	var offset = point_offset(this.angle, this.width / 2);
+	// game.particle_systems.smoke_particles.add_particle(this.px - offset.px, this.py - offset.py, 1);
+	// game.particle_systems.fire_particles.add_particle(this.px - offset.px, this.py - offset.py, 1);
+
+	if (Math.random() < 0.5) {
+		if (this.last_particle)
+			this.last_particle.start = { px: this.px + offset.px, py: this.py + offset.py };
+		this.last_particle = game.particle_systems.blue_missile_trail_particles.add_particle(this, { px: this.px + offset.px, py: this.py + offset.py }, 5);
+	}
+	
+	var target_point;
+	if (Math.abs(this.px - this.target.px) > 100) {
+		if (this.py > this.cruise_height) {
+			target_point = { px: this.target.px, py: this.py - Math.abs(this.px - this.target.px) };
+		} else {
+			target_point = { px: this.target.px, py: this.py };
+		}
+	} else {
+		target_point = this.target;
+	}
+	this.angle = point_angle(this.px, this.py, target_point.px, target_point.py);
 	
 	offset = point_offset(this.angle, this.speed);
 	this.px += offset.px;
@@ -726,6 +783,7 @@ function main () {
 		// game.entities.push(new FighterJetBlue(game, -20, 150, [ { sx: 2.5 }]));
 		game.entities.push(new SAMLauncherRed(game, 580, 350));
 		game.entities.push(new BunkerRed(game, 550, 380));
+		game.entities.push(new CruiseMissilePTBoatBlue(game, 50, 420));
 
 		setInterval(game.step_game_frame.bind(game, ctx), 1000 / 60);
 	});

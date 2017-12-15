@@ -230,6 +230,66 @@ FighterJetRed.prototype.hit = function(game, other) {
 	}
 };
 
+function AATankRed(game, px, py, path) {
+	PathEntity.call(this, game, px, py, 32, 32, 
+		image_flip(image_composite(image_colorize(game.images.aa_tank_coloring, this.color), game.images.aa_tank_base)), path);
+
+	this.fire_timer = 0;
+	// this.dead = false;
+	// this.sy = 0;
+	// this.angle_granularity = 5;
+}
+AATankRed.prototype = Object.create(PathEntity.prototype);
+AATankRed.prototype.color = '#f33';
+AATankRed.prototype.update = function(game) {
+	PathEntity.prototype.update.call(this, game);
+
+	var self = this;
+
+	if (this.fire_timer > 0) {
+		this.fire_timer--;
+	}
+
+	// detection and flare evasion
+	var targets = game.find_near(this, FighterJetBlue, 800);
+	targets = targets.filter(function (other) { return other.px < self.px; });
+	if (targets.length > 0 && this.fire_timer <= 0) {
+		this.fire_timer = 10;
+		var bullet_speed = 10;
+
+		var target = targets[0];
+		// calculate where the target will be after bullet flight time
+		var flight_time = points_dist(this, target) / bullet_speed;
+		var target_offset = { px: target.path[0].sx * flight_time, py: target.path[0].sy * flight_time };
+		target = { px: target.px + target_offset.px, py: target.py + target_offset.py };
+
+		// set the bullet on it's path
+		var angle = point_angle(this.px, this.py, target.px, target.py) + Math.random() * 5 - 2.5;
+		var bullet = new AABullet(game, this.px, this.py, [{ timeout: 60, speed: bullet_speed, angle: angle }]);
+		// var bullet = new AABullet(game, this.px, this.py, [{ timeout: 120, sx: 2, sy: 2 }]);
+		game.entities_to_add.push(bullet);
+	}
+
+	// // death spiral
+	// if (this.dead) {
+	// 	this.sy += 0.1;
+	// 	this.py += this.sy;
+
+	// 	this.angle = point_angle(0, 0, -this.path[0].sx, -this.sy);
+
+	// 	var offset = point_offset(this.angle, this.width / 2);
+	// 	game.particle_systems.large_smoke_particles.add_particle(this.px + offset.px, this.py + offset.py, 2);
+	// }
+
+};
+AATankRed.prototype.hit = function(game, other) {
+	this.dead = true;
+	for (var i = 0; i < 20; i++) {
+		game.particle_systems.large_smoke_particles.add_particle(this.px, this.py, 1.5);
+		game.particle_systems.fire_particles.add_particle(this.px, this.py, 2);
+	}
+};
+
 
 
 function PTBoatBlue(game, px, py, path) {
@@ -394,7 +454,7 @@ SAMLauncherRed.prototype.update = function(game) {
 		if (this.lock_on === 60) {
 			this.lock_on = 0;
 			this.missiles_loaded--;
-			game.entities_to_add.push(new SAMMissile(game, this.px, this.py - 4, this.color, enemies[0]));
+			game.entities_to_add.push(new SAMMissileRed(game, this.px, this.py - 4, this.color, enemies[0]));
 		}
 	} else {
 		this.lock_on = 0;
@@ -444,15 +504,15 @@ AirMissile.prototype.update = function(game) {
 	}
 };
 
-function SAMMissile(game, px, py, color, target) {
+function SAMMissileRed(game, px, py, color, target) {
 	ScreenEntity.call(this, game, px, py, 32, 32, 
 		image_composite(image_colorize(game.images.sam_missile_coloring, color), game.images.sam_missile_base));
 	this.target = target;
 	this.speed = 6;
 	this.angle_granularity = 5;
 }
-SAMMissile.prototype = Object.create(ScreenEntity.prototype);
-SAMMissile.prototype.update = function(game) {
+SAMMissileRed.prototype = Object.create(ScreenEntity.prototype);
+SAMMissileRed.prototype.update = function(game) {
 	ScreenEntity.prototype.update.call(this, game);
 
 	var offset = point_offset(this.angle, this.width / 2);
@@ -480,6 +540,33 @@ SAMMissile.prototype.update = function(game) {
 
 
 
+function AABullet(game, px, py, path) {
+	PathEntity.call(this, game, px, py, undefined, undefined, undefined, path);
+
+	this.particle = game.particle_systems.bullet_tracer_particles.add_particle(this, this, 1);
+	this.position_list = [];
+}
+AABullet.prototype = Object.create(PathEntity.prototype);
+AABullet.prototype.update = function(game) {
+	PathEntity.prototype.update.call(this, game);
+
+
+	this.particle.timer = 0;
+	this.position_list.push({ px: this.px, py: this.py });
+	if (this.position_list.length >= 5) {
+		this.particle.end = this.position_list.shift();
+	}
+
+	var targets = game.find_near(this, FighterJetBlue, 5);
+	for (var i = 0; i < targets.length; i++) {
+		targets[i].hit(game, this);
+	}
+};
+// AABullet.prototype.hit = function(game, other) {
+// 	game.entities_to_remove.push(this);
+// };
+
+
 function AirFlare(game, px, py, path) {
 	PathEntity.call(this, game, px, py, 16, 16, game.images.particle_flare, path);
 	this.max_frame = 8;
@@ -498,31 +585,7 @@ AirFlare.prototype.update = function(game) {
 			this.last_particle.start = { px: this.px, py: this.py };
 		this.last_particle = game.particle_systems.flare_trail_particles.add_particle(this, { px: this.px, py: this.py }, 5);
 	}
-
-	// 	this.flare_trail.push([this.px, this.py]);
-	// 	if (this.flare_trail.length >= 5)
-	// 		this.flare_trail.shift();
-	// }
 };
-// AirFlare.prototype.draw = function(ctx) {
-// 	PathEntity.prototype.draw.call(this, ctx);
-
-// 	ctx.strokeStyle = '#a84';
-// 	ctx.lineWidth = 1;
-
-// 	for (var i = this.flare_trail.length - 1; i >= 0; i--) {
-// 		ctx.beginPath();
-// 		ctx.lineWidth = i * 2 + 1;
-// 		if (i === this.flare_trail.length - 1) {
-// 			ctx.moveTo(this.px, this.py);
-// 		} else {
-// 			ctx.moveTo(this.flare_trail[i+1][0], this.flare_trail[i+1][1]);
-// 		}
-// 		ctx.lineTo(this.flare_trail[i][0], this.flare_trail[i][1]);
-// 		ctx.stroke();
-// 	}
-	
-// };
 AirFlare.prototype.hit = function(game, other) {
 	game.entities_to_remove.push(this);
 };
@@ -567,6 +630,8 @@ function main () {
 		fighter_jet_coloring: "fighter_jet_coloring.png",
 		pt_boat_base: "pt_boat_base.png",
 		pt_boat_coloring: "pt_boat_coloring.png",
+		aa_tank_base: "aa_tank_base.png",
+		aa_tank_coloring: "aa_tank_coloring.png",
 		sam_launcher_base: "sam_launcher_base.png",
 		sam_launcher_coloring: "sam_launcher_coloring.png",
 		air_missile_base: "air_missile_base.png",
@@ -595,8 +660,14 @@ function main () {
 			{ timeout: 150, action: { spawn_entity: [
 				{ class: FighterJetRed, px: 640 + 32, py: 150, args: [ [{ timeout: 360, sx: -2.5 }], ] },
 			]}},
+			{ timeout: 600, action: { spawn_entity: [
+				{ class: AATankRed, px: 640 + 32, py: 430, args: [ [
+					{ timeout: 300, sx: -1 },
+					{ timeout: 180 },
+				], ] },
+			]}},
 			{ timeout: 300, action: { spawn_entity: [
-				{ class: PTBoatBlue, px: -32, py: 400, args: [ [
+				{ class: PTBoatBlue, px: -32, py: 385, args: [ [
 					{ timeout: 330, sx: 1 },
 					{ timeout: 20, repeat: 3, spawn_entity: [{ class: SoldierBlue, px: 64, args: [[
 						{ timeout: 240, sx: 1 },

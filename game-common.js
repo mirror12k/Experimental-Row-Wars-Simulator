@@ -373,9 +373,10 @@ ScreenEntity.prototype.draw = function(ctx) {
 				this.sub_entities[i].draw(ctx);
 		}
 
-		ctx.drawImage(this.image,
-			this.frame * (this.image.width / this.max_frame), 0, this.image.width / this.max_frame, this.image.height,
-			0 - this.width / 2, 0 - this.height / 2, this.width, this.height);
+		if (this.image)
+			ctx.drawImage(this.image,
+				this.frame * (this.image.width / this.max_frame), 0, this.image.width / this.max_frame, this.image.height,
+				0 - this.width / 2, 0 - this.height / 2, this.width, this.height);
 
 		for (var i = 0; i < this.sub_entities.length; i++) {
 			if (this.sub_entities[i].z_index >= this.z_index)

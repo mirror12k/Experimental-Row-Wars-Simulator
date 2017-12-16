@@ -231,7 +231,7 @@ FighterJetRed.prototype.hit = function(game, other) {
 };
 
 function AATankRed(game, px, py, path) {
-	PathEntity.call(this, game, px, py, 32, 32, 
+	PathEntity.call(this, game, px, py, 48, 48, 
 		image_flip(image_composite(image_colorize(game.images.aa_tank_coloring, this.color), game.images.aa_tank_base)), path);
 
 	this.fire_timer = 0;
@@ -600,7 +600,7 @@ CruiseMissile.prototype.update = function(game) {
 function AABullet(game, px, py, path) {
 	PathEntity.call(this, game, px, py, undefined, undefined, undefined, path);
 
-	this.particle = game.particle_systems.bullet_tracer_particles.add_particle(this, this, 1);
+	this.particle = game.particle_systems.bullet_tracer_particles.add_particle(this, this, 3);
 	this.position_list = [];
 }
 AABullet.prototype = Object.create(PathEntity.prototype);
@@ -673,6 +673,108 @@ SpawnerSystem.prototype.update = function(game) {
 SpawnerSystem.prototype.draw = function(ctx) {};
 
 
+function TileRenderer(game, sizex, sizey, width, height, tilesheet, tile_sizex, tile_sizey) {
+	RenderedGridSystem.call(this, game, sizex, sizey, width, height);
+	this.tilesheet = tilesheet;
+	this.tile_sizex = tile_sizex;
+	this.tile_sizey = tile_sizey;
+	this.tile_maxframe_x = tilesheet.width / tile_sizex;
+}
+TileRenderer.prototype = Object.create(RenderedGridSystem.prototype);
+TileRenderer.prototype.render_rect = function(ctx, p, w, h) {
+	for (var x = p[0]; x < p[0] + w; x++) {
+		for (var y = p[1]; y < p[1] + h; y++) {
+			if (this.grid[x][y] >= 0) {
+				var framex = this.grid[x][y] % this.tile_maxframe_x;
+				var framey = Math.floor(this.grid[x][y] / this.tile_maxframe_x);
+				// console.log("debug render:", x, y, framex, framey);
+
+				ctx.save();
+				ctx.translate(x * this.width, y * this.height);
+				ctx.clearRect(0, 0, this.width, this.height);
+				ctx.drawImage(this.tilesheet, this.tile_sizex * framex, this.tile_sizey * framey, this.tile_sizex, this.tile_sizey,
+						0, 0, this.width, this.height);
+				ctx.restore();
+			} else {
+				ctx.save();
+				ctx.translate(x * this.width, y * this.height);
+				ctx.clearRect(0, 0, this.width, this.height);
+				ctx.restore();
+			}
+		}
+	}
+};
+
+
+function TileEditor(game, width, height, tilesheet, tile_sizex, tile_sizey, target_system) {
+	Entity.call(this, game);
+	this.width = width;
+	this.height = height;
+	this.tilesheet = tilesheet;
+	this.tile_sizex = tile_sizex;
+	this.tile_sizey = tile_sizey;
+	this.tile_maxframe_x = tilesheet.width / tile_sizex;
+
+	this.target_system = target_system;
+	this.tile_selected = 0;
+}
+TileEditor.prototype = Object.create(Entity.prototype);
+TileEditor.prototype.update = function(game) {
+	Entity.prototype.update.call(this, game);
+
+	this.tile_position = game.mouse_position;
+	if (game.mouse1_state) {
+		var p = game.game_systems[this.target_system].get_point(game.mouse_position.px, game.mouse_position.py);
+		game.game_systems[this.target_system].rect_set(p, 1, 1, this.tile_selected);
+	}
+
+	if (game.keystate.Q && !game.previous_keystate.Q) {
+		this.tile_selected--;
+	}
+
+	if (game.keystate.E && !game.previous_keystate.E) {
+		this.tile_selected++;
+	}
+
+	if (game.keystate.Y && !game.previous_keystate.Y) {
+		console.log(JSON.stringify(game.game_systems[this.target_system].grid));
+	}
+};
+TileEditor.prototype.draw = function(ctx) {
+	if (this.visible) {
+		ctx.save();
+
+		ctx.globalAlpha = this.alpha;
+
+		ctx.translate(this.tile_position.px, this.tile_position.py);
+		ctx.rotate(Math.PI * (Math.floor(this.angle / this.angle_granularity) * this.angle_granularity) / 180);
+
+		for (var i = 0; i < this.sub_entities.length; i++) {
+			if (this.sub_entities[i].z_index < this.z_index)
+				this.sub_entities[i].draw(ctx);
+		}
+
+		if (this.tilesheet) {
+			var framex = this.tile_selected % this.tile_maxframe_x;
+			var framey = Math.floor(this.tile_selected / this.tile_maxframe_x);
+
+			ctx.drawImage(this.tilesheet,
+				framex * this.tile_sizex, framey * this.tile_sizey, this.tile_sizex, this.tile_sizey,
+				0, 0, this.width, this.height);
+		}
+
+		for (var i = 0; i < this.sub_entities.length; i++) {
+			if (this.sub_entities[i].z_index >= this.z_index)
+				this.sub_entities[i].draw(ctx);
+		}
+
+		ctx.restore();
+	}
+};
+
+
+
+
 function main () {
 	var canvas = document.querySelector('#game_canvas');
 	var ctx = canvas.getContext('2d');
@@ -700,6 +802,8 @@ function main () {
 		bunker_base: "bunker_base.png",
 		bunker_coloring: "bunker_coloring.png",
 
+		background_tiles: "background_tiles.png",
+
 		particle_steam: "particle_steam.png",
 		particle_flare: "particle_flare.png",
 	};
@@ -709,6 +813,33 @@ function main () {
 
 
 		var game = new GameSystem(canvas, images);
+
+		game.game_systems.background_renderer = new TileRenderer(game, 640 / 32, 480 / 32, 32, 32, game.images.background_tiles, 16, 16);
+		// game.game_systems.background_renderer.set_grid(game.game_systems.background_renderer.generate_grid(12));
+		game.game_systems.background_renderer.set_grid([
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,8,12,12,12,12],
+			[4,4,4,4,4,4,4,4,4,4,9,13,13,13,13],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14],
+			[4,4,4,4,4,4,4,4,4,4,10,14,14,14,14]
+		]);
+		game.game_systems.background_renderer.z_index = -1;
+		// game.game_systems.tile_editor = new TileEditor(game, 32, 32, game.images.background_tiles, 16, 16, 'background_renderer');
 
 		game.game_systems.spawner_system = new SpawnerSystem(game, [
 			{ timeout: 120, action: { spawn_entity: [

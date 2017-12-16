@@ -71,6 +71,7 @@ function GameSystem(canvas, images) {
 	this.debug_time = { game_update_time: 0, game_draw_time: 0, game_entity_draw_time: {}, };
 	this.debug_time_timer = 0;
 
+	this.previous_keystate = {};
 	this.keystate = {
 		W: false,
 		A: false,
@@ -182,6 +183,9 @@ GameSystem.prototype.update = function () {
 	for (var i = 0; i < keys.length; i++) {
 		this.particle_systems[keys[i]].update(this);
 	}
+	
+	this.previous_keystate = this.keystate;
+	this.keystate = Object.assign({}, this.keystate);
 };
 GameSystem.prototype.draw = function (ctx) {
 	ctx.clearRect(0, 0, 640, 480);
@@ -885,14 +889,14 @@ DebugSystem.prototype.add_debug_square = function(pxy, width, color, thickness) 
 
 
 
-function GridSystem (game, sizex, sizey, width, height) {
+function GridSystem(game, sizex, sizey, width, height) {
 	Entity.call(this, game);
 	this.sizex = sizex;
 	this.sizey = sizey;
 	this.width = width;
 	this.height = height;
 
-	this.grid = this.generate_grid(0);
+	// this.grid = this.generate_grid(0);
 }
 GridSystem.prototype = Object.create(Entity.prototype);
 GridSystem.prototype.class_name = 'GridSystem';
@@ -1072,7 +1076,6 @@ GridSystem.prototype.rect_set = function(p, w, h, value) {
 
 function RenderedGridSystem (game, sizex, sizey, width, height) {
 	GridSystem.call(this, game, sizex, sizey, width, height);
-	this.rendered_grid = this.render();
 }
 RenderedGridSystem.prototype = Object.create(GridSystem.prototype);
 RenderedGridSystem.prototype.class_name = 'RenderedGridSystem';
@@ -1093,6 +1096,12 @@ RenderedGridSystem.prototype.render = function() {
 	return buffer_canvas;
 };
 
+RenderedGridSystem.prototype.set_grid = function(grid) {
+	this.grid = grid;
+	console.log("debug");
+	this.rendered_grid = this.render();
+	// this.update_render([0, 0], this.sizex, this.sizey);
+};
 RenderedGridSystem.prototype.rect_set = function(p, w, h, value) {
 	GridSystem.prototype.rect_set.call(this, p, w, h, value);
 	this.update_render(p, w, h);

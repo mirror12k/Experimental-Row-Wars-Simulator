@@ -783,29 +783,29 @@ function main () {
 
 
 	var images = {
-		ufo: "ufo.png",
+		ufo: "assets/ufo.png",
 
-		fighter_jet_base: "fighter_jet_base.png",
-		fighter_jet_coloring: "fighter_jet_coloring.png",
-		pt_boat_base: "pt_boat_base.png",
-		pt_boat_coloring: "pt_boat_coloring.png",
-		aa_tank_base: "aa_tank_base.png",
-		aa_tank_coloring: "aa_tank_coloring.png",
-		sam_launcher_base: "sam_launcher_base.png",
-		sam_launcher_coloring: "sam_launcher_coloring.png",
-		air_missile_base: "air_missile_base.png",
-		air_missile_coloring: "air_missile_coloring.png",
-		sam_missile_base: "sam_missile_base.png",
-		sam_missile_coloring: "sam_missile_coloring.png",
-		soldier_base: "soldier_base.png",
-		soldier_coloring: "soldier_coloring.png",
-		bunker_base: "bunker_base.png",
-		bunker_coloring: "bunker_coloring.png",
+		fighter_jet_base: "assets/fighter_jet_base.png",
+		fighter_jet_coloring: "assets/fighter_jet_coloring.png",
+		pt_boat_base: "assets/pt_boat_base.png",
+		pt_boat_coloring: "assets/pt_boat_coloring.png",
+		aa_tank_base: "assets/aa_tank_base.png",
+		aa_tank_coloring: "assets/aa_tank_coloring.png",
+		sam_launcher_base: "assets/sam_launcher_base.png",
+		sam_launcher_coloring: "assets/sam_launcher_coloring.png",
+		air_missile_base: "assets/air_missile_base.png",
+		air_missile_coloring: "assets/air_missile_coloring.png",
+		sam_missile_base: "assets/sam_missile_base.png",
+		sam_missile_coloring: "assets/sam_missile_coloring.png",
+		soldier_base: "assets/soldier_base.png",
+		soldier_coloring: "assets/soldier_coloring.png",
+		bunker_base: "assets/bunker_base.png",
+		bunker_coloring: "assets/bunker_coloring.png",
 
-		background_tiles: "background_tiles.png",
+		background_tiles: "assets/background_tiles.png",
 
-		particle_steam: "particle_steam.png",
-		particle_flare: "particle_flare.png",
+		particle_steam: "assets/particle_steam.png",
+		particle_flare: "assets/particle_flare.png",
 	};
 
 	load_all_images(images, function () {

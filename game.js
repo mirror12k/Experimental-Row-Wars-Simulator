@@ -89,9 +89,9 @@ ConfettiParticleEffectSystem.prototype.draw = function(ctx) {
 			if (this.stroke_transition) {
 				var degree = p.timer / this.particle_max_timer;
 				var color = [
-					this.stroke_style[0] * (1 - degree) + this.stroke_transition[0] * degree,
-					this.stroke_style[1] * (1 - degree) + this.stroke_transition[1] * degree,
-					this.stroke_style[2] * (1 - degree) + this.stroke_transition[2] * degree,
+					Math.floor(this.stroke_style[0] * (1 - degree) + this.stroke_transition[0] * degree),
+					Math.floor(this.stroke_style[1] * (1 - degree) + this.stroke_transition[1] * degree),
+					Math.floor(this.stroke_style[2] * (1 - degree) + this.stroke_transition[2] * degree),
 				];
 				ctx.strokeStyle = 'rgb('+color[0]+','+color[1]+','+color[2]+')';
 			} else {
